@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 import time
 
+# add src to path
 sys.path.append(str(Path(__file__).parent))
 
 def init_session_state():
@@ -52,7 +53,9 @@ def api_process_images(image_dir):
 def layout_load_existing_metadata():
 	with st.expander("Load Existing Metadata", expanded=True):
 		# Placeholder for loading metadata logic
-		metadata_path = st.text_input("Enter Metadata File Path", placeholder="path/to/metadata.json")
+		metadata_path = st.file_uploader("Upload Metadata File", type=["json"])
+		if metadata_path:
+			metadata_path = metadata_path.name
 		load_metadata = st.button("Load Metadata")
 		if load_metadata:
 			if metadata_path:
