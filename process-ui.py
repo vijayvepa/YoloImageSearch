@@ -79,9 +79,15 @@ def api_process_images(image_dir, model_path="yolollm.pt"):
 def layout_load_existing_metadata():
 	with st.expander("Load Existing Metadata", expanded=True):
 		# Placeholder for loading metadata logic
-		metadata_path = st.file_uploader("Upload Metadata File", type=["json"])
-		if metadata_path:
-			metadata_path = metadata_path.name
+		uploaded_model = st.file_uploader("Upload Metadata File", type=["json"])
+		
+		metadata_path = None
+		if uploaded_model is not None:
+			tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".json")
+			tmp_file.write(uploaded_model.getbuffer())
+			tmp_file.flush()
+			tmp_file.close()
+			metadata_path = tmp_file.name
 		load_metadata_button = st.button("Load Metadata")
 		if load_metadata_button:
 			if metadata_path:

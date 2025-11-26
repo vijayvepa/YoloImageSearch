@@ -24,14 +24,6 @@ def load_metadata(metadata_path):
 	"""
 	Load metadata from a JSON file.
 	"""
-	metadata_path = Path(metadata_path)  # Ensure path is valid
-	if not metadata_path.exists():
-		processed_path = metadata_path.parent / "processed" / metadata_path.name / "metadata.json"
-		if processed_path.exists():
-			metadata_path = processed_path
-		else:
-			raise FileNotFoundError(f"Metadata file not found at {metadata_path} or {processed_path}")
-
 	with open(metadata_path, 'r') as f:
 		metadata = json.load(f)
 	return metadata
