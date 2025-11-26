@@ -26,3 +26,7 @@ nvidia-smi
 
 ## forums-for-more-info :
 - https://forums.developer.nvidia.com/t/whats-the-relationship-between-cuda-toolkit-and-pytorch/251096/2
+
+
+# Yolo 11m
+- [Yolo11m.pt](https://huggingface.co/Ultralytics/YOLO11/blob/main/yolo11m.pt)

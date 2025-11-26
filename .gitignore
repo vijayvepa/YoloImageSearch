@@ -1,2 +1,8 @@
 env/
 gpu/
+processed/raw/metadata.json
+src/__pycache__/config.cpython-311.pyc
+src/__pycache__/inference.cpython-311.pyc
+src/__pycache__/utils.cpython-311.pyc
+data/processed/
+data/raw/
