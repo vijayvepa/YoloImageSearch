@@ -25,6 +25,11 @@ def init_session_state():
         "metadata": None,
         "unique_classes": [],
         "count_options": {},
+        "search_parameters": {
+            "search_mode": "Any of the selected classes (OR)",
+            "selected_classes": [],
+            "thresholds": {},
+        },
     }
     for key, value in session_defaults.items():
         if key not in st.session_state:
@@ -206,6 +211,7 @@ def layout_load_existing_metadata():
 
                     st.session_state.metadata = metadata
                     st.session_state.unique_classes = unique_classes
+                    st.session_state.count_options = count_options
                 except Exception as e:
                     st.error(f"Error Loading Metadata: {e}")
                     st.code(traceback.format_exc())
@@ -223,6 +229,32 @@ def api_load_metadata(metadata_path):
     time.sleep(3)
 
 
+def layout_search_images():
+    """
+    ## Search Images Layout
+    """
+    # Header with search icon
+    st.header("🔎 Search Images")
+    with st.container():
+      search_mode = st.radio("Search Mode:", ("Any of the selected classes (OR)", "All of the selected classes (AND)"), key="search_mode", horizontal=True)
+      classes_to_search = st.multiselect("Classes to Search:", options=st.session_state.unique_classes, key="selected_classes")
+      
+      thresholds = {}
+      if classes_to_search is not None and len(classes_to_search) > 0:
+        st.subheader("Count Thresholds (optional)")
+        cols = st.columns(len(classes_to_search))
+        for i, cls in enumerate(classes_to_search):
+          with cols[i]:
+            threshold = st.selectbox(f"Max Count for {cls}", options=["None"] + st.session_state.count_options[cls], key=f"threshold_{cls}")
+            thresholds[cls] = threshold
+      st.session_state.search_parameters["search_mode"] = search_mode
+      st.session_state.search_parameters["selected_classes"] = classes_to_search
+      st.session_state.search_parameters["thresholds"] = thresholds
+    
+    search_button = st.button("Search Images", type="primary")
+    if search_button and classes_to_search:
+      pass# Implement search logic here
+
 init_session_state()
 st.set_page_config(page_title="YOLOv11 Image Processing", page_icon="⚙️", layout="wide")
 st.title("Computer Vision Powered Image Processing")
@@ -239,3 +271,6 @@ if main_option == "Process New Images":
 
 elif main_option == "Load Existing Metadata":
     layout_load_existing_metadata()
+
+if st.session_state.metadata is not None:
+    layout_search_images()
