@@ -73,8 +73,10 @@ class YOLOv11Inference:
         This centralizes the globbing logic so callers (UI or other code) can
         reuse the same extensions configured for the inference class.
         """
+        # Use recursive search so images inside subdirectories (e.g. from a ZIP)
+        # are also discovered.
         patterns = [f"*{ext}" for ext in self.extensions]
         image_paths = []
         for pattern in patterns:
-            image_paths.extend(Path(directory).glob(pattern))
+            image_paths.extend(Path(directory).rglob(pattern))
         return sorted(image_paths)

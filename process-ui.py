@@ -8,6 +8,9 @@ from src.inference import YOLOv11Inference
 from src.utils import get_unique_classes, save_metadata, load_metadata
 import tempfile
 from typing import Optional
+import zipfile
+import shutil
+import os
 
 # add src to path
 # sys.path.append(str(Path(__file__).parent))
@@ -48,6 +51,57 @@ def save_uploaded_tempfile(uploaded_file, suffix: str) -> Optional[str]:
     return tmp_file.name
 
 
+def start_inference(zip_path: str, model_path: Optional[str]):
+    """Extract a ZIP file, process images in the extracted folder, cleanup and
+    return (metadata, metadata_path).
+
+    Args:
+        zip_path: Path to the uploaded ZIP file on disk.
+        model_path: Optional path to a model weights file.
+
+    Returns:
+        Tuple (metadata, metadata_path) on success, or (None, None) on failure.
+    """
+    if not zip_path:
+        st.warning("No ZIP file provided to start_inference.")
+        return None, None
+    if not model_path:
+        st.warning(
+            "Model weights pyTorch file needed. Download from [Yolo11m.pt](https://huggingface.co/Ultralytics/YOLO11/blob/main/yolo11m.pt)."
+        )
+        return None, None
+
+    extract_dir = tempfile.mkdtemp()
+    metadata = None
+    metadata_path = None
+    try:
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            zf.extractall(extract_dir)
+
+        metadata, metadata_path = api_process_images(extract_dir, model_path=model_path)
+
+    except Exception as e:
+        st.error(f"Unable to extract/process ZIP: {e}")
+        st.code(traceback.format_exc())
+        metadata = None
+        metadata_path = None
+
+    finally:
+        # Cleanup extracted files and uploaded zip file
+        try:
+            if os.path.exists(extract_dir):
+                shutil.rmtree(extract_dir)
+        except Exception:
+            pass
+        try:
+            if zip_path and os.path.exists(zip_path):
+                os.remove(zip_path)
+        except Exception:
+            pass
+
+    return metadata, metadata_path
+
+
 def layout_process_new_images():
     """
     ## Process New Images (Layout)
@@ -56,21 +110,25 @@ def layout_process_new_images():
         col1, col2 = st.columns(2)
         # Placeholder for image processing logic
         with col1:
-            image_dir = st.text_input(
-                "Enter Image Directory", placeholder="path/to/images"
-            )
+            # Instead of supplying a folder path, the UI now accepts a ZIP
+            # containing images. The ZIP will be extracted and processed.
+            uploaded_zip = st.file_uploader("Upload Images ZIP", type=["zip"])
+            image_dir = None
+            if uploaded_zip is not None:
+                # Save uploaded zip to a temporary file
+                zip_path = save_uploaded_tempfile(uploaded_zip, suffix=".zip")
+                image_dir = None
         with col2:
             uploaded_model = st.file_uploader("Upload Model Weights (.pt)", type=["pt"])
             model_path = save_uploaded_tempfile(uploaded_model, suffix=".pt")
-        start_inference = st.button("Start Inference")
-        if start_inference:
-            if image_dir:
-                st.spinner("Processing images...")
+        start_inference_button = st.button("Start Inference")
+        if start_inference_button:
+            if uploaded_zip is not None and zip_path is not None:
+                with st.spinner("Processing images..."):
+                    metadata, metadata_path = start_inference(zip_path, model_path)
 
-                try:
-                    metadata, metadata_path = api_process_images(
-                        image_dir, model_path=model_path
-                    )
+                # If metadata is None, an error was already shown inside start_inference
+                if metadata is not None:
                     unique_classes, count_options = get_unique_classes(metadata)
 
                     st.success(f"Processed {len(metadata)} images,  metadata saved")
@@ -81,16 +139,12 @@ def layout_process_new_images():
                     st.session_state.metadata = metadata
                     st.session_state.unique_classes = unique_classes
                     st.session_state.count_options = count_options
-                except Exception as e:
-                    st.error(f"Unable to process images: {str(e)}")
-                    st.code(traceback.format_exc())
-                    st.code(e)
 
             else:
-                st.warning("Please provide a valid image directory.")
+                st.warning("Please upload a ZIP file containing images.")
 
 
-def api_process_images(image_dir, model_path="yolollm.pt"):
+def api_process_images(image_dir, model_path):
     """
     ## Process New Images (API)
     """
@@ -119,7 +173,8 @@ def api_process_images(image_dir, model_path="yolollm.pt"):
 
         pct = int((idx / total) * 100)
         progress_bar.progress(pct)
-        status_text.text(f"Processing {img_path} - {idx}/{total} ({pct}%)")
+        image_name = Path(img_path).name
+        status_text.text(f"Processing {image_name} - {idx}/{total} ({pct}%)")
 
     # finalize UI
     progress_bar.progress(100)
