@@ -30,6 +30,7 @@ def init_session_state():
             "selected_classes": [],
             "thresholds": {},
         },
+        "search_results": [],
     }
     for key, value in session_defaults.items():
         if key not in st.session_state:
@@ -228,7 +229,36 @@ def api_load_metadata(metadata_path):
     """
     time.sleep(3)
 
-
+def api_search_images(search_parameters,metadata):
+		"""
+		## Search Images (API)
+		"""
+		results = []
+		for item in metadata:
+			matches = False
+			class_matches = {}
+			for cls in search_parameters["selected_classes"]:
+				class_detections = [det for det in item.get("detections", []) if det["class"] == cls]
+				class_count = len(class_detections)
+				class_matches[cls] = False
+				threshold = search_parameters["thresholds"].get(cls, "None")
+				if threshold == "None":
+					if class_count >= 1:
+						class_matches[cls] = True
+				else:
+					if class_count <= int(threshold):
+						class_matches[cls] = True
+			if search_parameters["search_mode"] == "Any of the selected classes (OR)":
+				if any(class_matches.values()):
+					matches = True
+			else:  # All of the selected classes (AND)
+				if all(class_matches.values()):
+					matches = True
+			if matches:
+				results.append(item)
+		st.session_state.search_results = results
+		st.code(results)
+  
 def layout_search_images():
     """
     ## Search Images Layout
@@ -253,7 +283,7 @@ def layout_search_images():
     
     search_button = st.button("Search Images", type="primary")
     if search_button and classes_to_search:
-      pass# Implement search logic here
+      api_search_images(st.session_state.search_parameters, st.session_state.metadata)# Implement search logic here
 
 init_session_state()
 st.set_page_config(page_title="YOLOv11 Image Processing", page_icon="⚙️", layout="wide")
