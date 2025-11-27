@@ -257,7 +257,8 @@ def api_search_images(search_parameters,metadata):
 			if matches:
 				results.append(item)
 		st.session_state.search_results = results
-		st.code(results)
+		st.text("Found {} images matching criteria".format(len(results)))
+		st.write(results)
   
 def layout_search_images():
     """
