@@ -96,12 +96,8 @@ def api_process_images(image_dir, model_path="yolollm.pt"):
     """
     inference = YOLOv11Inference(model_path)
 
-    # Collect image paths using the same extensions configured in the inference class
-    patterns = [f"*{ext}" for ext in inference.extensions]
-    image_paths = []
-    for pattern in patterns:
-        image_paths.extend(Path(image_dir).glob(pattern))
-    image_paths = sorted(image_paths)
+    # Collect image paths using the inference helper so extensions stay in sync
+    image_paths = inference.list_image_paths(image_dir)
 
     total = len(image_paths)
     if total == 0:
@@ -123,7 +119,7 @@ def api_process_images(image_dir, model_path="yolollm.pt"):
 
         pct = int((idx / total) * 100)
         progress_bar.progress(pct)
-        status_text.text(f"Processing {idx}/{total} ({pct}%)")
+        status_text.text(f"Processing {img_path} - {idx}/{total} ({pct}%)")
 
     # finalize UI
     progress_bar.progress(100)
