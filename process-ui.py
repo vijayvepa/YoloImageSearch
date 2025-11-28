@@ -11,6 +11,8 @@ from typing import Optional
 import zipfile
 import shutil
 import os
+from PIL import Image, ImageDraw, ImageFont
+import base64
 
 # add src to path
 # sys.path.append(str(Path(__file__).parent))
@@ -31,6 +33,9 @@ def init_session_state():
             "thresholds": {},
         },
         "search_results": [],
+        "show_boxes": True,
+        "grid_columns": 3,
+        "highlight_matches": True,
     }
     for key, value in session_defaults.items():
         if key not in st.session_state:
@@ -229,37 +234,39 @@ def api_load_metadata(metadata_path):
     """
     time.sleep(3)
 
-def api_search_images(search_parameters,metadata):
-		"""
-		## Search Images (API)
-		"""
-		results = []
-		for item in metadata:
-			matches = False
-			class_matches = {}
-			for cls in search_parameters["selected_classes"]:
-				class_detections = [det for det in item.get("detections", []) if det["class"] == cls]
-				class_count = len(class_detections)
-				class_matches[cls] = False
-				threshold = search_parameters["thresholds"].get(cls, "None")
-				if threshold == "None":
-					if class_count >= 1:
-						class_matches[cls] = True
-				else:
-					if class_count <= int(threshold):
-						class_matches[cls] = True
-			if search_parameters["search_mode"] == "Any of the selected classes (OR)":
-				if any(class_matches.values()):
-					matches = True
-			else:  # All of the selected classes (AND)
-				if all(class_matches.values()):
-					matches = True
-			if matches:
-				results.append(item)
-		st.session_state.search_results = results
-		st.text("Found {} images matching criteria".format(len(results)))
-		st.write(results)
-  
+
+def api_search_images(search_parameters, metadata):
+    """
+    ## Search Images (API)
+    """
+    results = []
+    for item in metadata:
+        matches = False
+        class_matches = {}
+        for cls in search_parameters["selected_classes"]:
+            class_detections = [
+                det for det in item.get("detections", []) if det["class"] == cls
+            ]
+            class_count = len(class_detections)
+            class_matches[cls] = False
+            threshold = search_parameters["thresholds"].get(cls, "None")
+            if threshold == "None":
+                if class_count >= 1:
+                    class_matches[cls] = True
+            else:
+                if class_count <= int(threshold):
+                    class_matches[cls] = True
+        if search_parameters["search_mode"] == "Any of the selected classes (OR)":
+            if any(class_matches.values()):
+                matches = True
+        else:  # All of the selected classes (AND)
+            if all(class_matches.values()):
+                matches = True
+        if matches:
+            results.append(item)
+    st.session_state.search_results = results
+
+
 def layout_search_images():
     """
     ## Search Images Layout
@@ -267,24 +274,167 @@ def layout_search_images():
     # Header with search icon
     st.header("🔎 Search Images")
     with st.container():
-      search_mode = st.radio("Search Mode:", ("Any of the selected classes (OR)", "All of the selected classes (AND)"), key="search_mode", horizontal=True)
-      classes_to_search = st.multiselect("Classes to Search:", options=st.session_state.unique_classes, key="selected_classes")
-      
-      thresholds = {}
-      if classes_to_search is not None and len(classes_to_search) > 0:
-        st.subheader("Count Thresholds (optional)")
-        cols = st.columns(len(classes_to_search))
-        for i, cls in enumerate(classes_to_search):
-          with cols[i]:
-            threshold = st.selectbox(f"Max Count for {cls}", options=["None"] + st.session_state.count_options[cls], key=f"threshold_{cls}")
-            thresholds[cls] = threshold
-      st.session_state.search_parameters["search_mode"] = search_mode
-      st.session_state.search_parameters["selected_classes"] = classes_to_search
-      st.session_state.search_parameters["thresholds"] = thresholds
-    
+        search_mode = st.radio(
+            "Search Mode:",
+            ("Any of the selected classes (OR)", "All of the selected classes (AND)"),
+            key="search_mode",
+            horizontal=True,
+        )
+        classes_to_search = st.multiselect(
+            "Classes to Search:",
+            options=st.session_state.unique_classes,
+            key="selected_classes",
+        )
+
+        thresholds = {}
+        if classes_to_search is not None and len(classes_to_search) > 0:
+            st.subheader("Count Thresholds (optional)")
+            cols = st.columns(len(classes_to_search))
+            for i, cls in enumerate(classes_to_search):
+                with cols[i]:
+                    threshold = st.selectbox(
+                        f"Max Count for {cls}",
+                        options=["None"] + st.session_state.count_options[cls],
+                        key=f"threshold_{cls}",
+                    )
+                    thresholds[cls] = threshold
+        st.session_state.search_parameters["search_mode"] = search_mode
+        st.session_state.search_parameters["selected_classes"] = classes_to_search
+        st.session_state.search_parameters["thresholds"] = thresholds
+
     search_button = st.button("Search Images", type="primary")
     if search_button and classes_to_search:
-      api_search_images(st.session_state.search_parameters, st.session_state.metadata)# Implement search logic here
+        api_search_images(
+            st.session_state.search_parameters, st.session_state.metadata
+        )  # Implement search logic here
+
+import base64
+import io
+def image_to_base64(image: Image.Image) -> str:
+		"""Convert an image file to a base64-encoded string."""
+		buffered = io.BytesIO()
+		image.save(buffered, format="PNG")
+		img_base64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
+		return img_base64
+
+def layout_image_box(image, meta_items, image_path):
+		"""Display an image with its metadata in a Streamlit box."""
+		img_base64 = image_to_base64(image)
+		meta_html = ",".join(meta_items) if meta_items else "No matches";
+		image_name = Path(image_path).name
+		box_html = f"""
+		<div class="image-card">
+				<div class="image-container">
+					<img src="data:image/png;base64,{img_base64}"><br>
+				</div>
+				<div class="meta:overlay">
+					<strong>{image_name}</strong><br/>{meta_html}
+			</div>
+		</div>
+		"""
+		st.markdown(box_html, unsafe_allow_html=True)
+
+def layout_draw_boxes(image, detections, search_parameters, highlight_matches):
+    """
+    Draw bounding boxes and labels on the image according to search parameters.
+
+    Args:
+        image: PIL.Image object (RGB)
+        detections: list of detection dicts (with 'class', 'bbox', 'confidence')
+        search_parameters: dict with 'selected_classes' (list)
+        highlight_matches: bool, whether to highlight matches
+
+    Returns:
+        PIL.Image with boxes and labels drawn
+    """
+    draw = ImageDraw.Draw(image)
+    try:
+        font = ImageFont.truetype("arial.ttf", 15)
+    except:
+        font = ImageFont.load_default()
+
+    for det in detections:
+        cls = det["class"]
+        bbox = det["bbox"]  # [x1, y1, x2, y2]
+        if cls in search_parameters["selected_classes"] and highlight_matches:
+            box_color = "#00ff00"  # Green for matches
+            thickness = 3
+        elif not highlight_matches:
+            box_color = "#c0c0c0"  # Gray for non-matches
+            thickness = 1
+        else:
+            continue
+
+        draw.rectangle(bbox, outline=box_color, width=thickness)
+        if cls in search_parameters["selected_classes"] or not highlight_matches:
+            label = f"{cls} ({det['confidence']:.2f})"
+            text_bbox = draw.textbbox((0, 0), label, font=font)
+            text_width = text_bbox[2] - text_bbox[0]
+            text_height = text_bbox[3] - text_bbox[1]
+            draw.rectangle(
+                [bbox[0], bbox[1], bbox[0] + text_width + 4, bbox[1] + text_height + 4],
+                fill=box_color,
+            )
+            draw.text((bbox[0] + 2, bbox[1] + 2), label, fill="black", font=font)
+
+    return image
+
+
+def layout_search_results(results):
+    if len(results) == 0:
+        st.info("No images found matching the search criteria.")
+        return
+
+    st.subheader("📷 Search Results")
+    st.text("{} images  matching criteria".format(len(results)))
+    with st.expander("Display Options", expanded=True):
+        cols = st.columns(3)
+        with cols[0]:
+            st.session_state.show_boxes = st.checkbox(
+                "Show Bounding Boxes",
+                value=st.session_state.show_boxes
+            )
+        with cols[1]:
+            st.session_state.grid_columns = st.slider(
+                "Grid Columns",
+                min_value=2,
+                max_value=6,
+                value=st.session_state.grid_columns
+            )
+        with cols[2]:
+            st.session_state.highlight_matches = st.checkbox(
+                "Highlight Matches",
+                value=st.session_state.highlight_matches
+            )
+
+        grid_columns = st.columns(st.session_state.grid_columns)
+        col_index = 0
+
+        search_parameters = st.session_state.search_parameters
+        for result in results:
+            with grid_columns[col_index]:
+                try:
+                    image_path = result["image_path"]
+                    image = Image.open(image_path).convert("RGB")
+
+                    if st.session_state.show_boxes:
+                        image = layout_draw_boxes(
+                            image,
+                            result.get("detections", []),
+                            st.session_state.search_parameters,
+                            st.session_state.highlight_matches,
+                        )
+                    meta_items = [f"{k}: {v}" for k, v in result["class_counts"].items()]
+                    
+                    layout_image_box(image, meta_items=meta_items, image_path=image_path)
+                    
+                    col_index = (col_index + 1) % st.session_state.grid_columns
+
+                except Exception as e:
+                    st.error(f"Error loading image {image_path}: {e}")
+
+
+###-------------
 
 init_session_state()
 st.set_page_config(page_title="YOLOv11 Image Processing", page_icon="⚙️", layout="wide")
@@ -305,3 +455,7 @@ elif main_option == "Load Existing Metadata":
 
 if st.session_state.metadata is not None:
     layout_search_images()
+
+if st.session_state.search_results is not None:
+    results = st.session_state.search_results
+    layout_search_results(results)
