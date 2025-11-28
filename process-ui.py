@@ -320,14 +320,14 @@ def image_to_base64(image: Image.Image) -> str:
 def layout_image_box(image, meta_items, image_path):
 		"""Display an image with its metadata in a Streamlit box."""
 		img_base64 = image_to_base64(image)
-		meta_html = ",".join(meta_items) if meta_items else "No matches";
+		meta_html = ", ".join(meta_items) if meta_items else "No matches";
 		image_name = Path(image_path).name
 		box_html = f"""
 		<div class="image-card">
 				<div class="image-container">
 					<img src="data:image/png;base64,{img_base64}"><br>
 				</div>
-				<div class="meta:overlay">
+				<div class="meta-overlay">
 					<strong>{image_name}</strong><br/>{meta_html}
 			</div>
 		</div>
@@ -425,14 +425,74 @@ def layout_search_results(results):
                             st.session_state.highlight_matches,
                         )
                     meta_items = [f"{k}: {v}" for k, v in result["class_counts"].items()]
-                    
+
                     layout_image_box(image, meta_items=meta_items, image_path=image_path)
-                    
+
                     col_index = (col_index + 1) % st.session_state.grid_columns
 
                 except Exception as e:
                     st.error(f"Error loading image {image_path}: {e}")
 
+## region Styles
+st.markdown(
+    f"""
+<style>
+/* Main container adjustments */
+.st-emotion-cache-1v0mbdj {{
+    width: 100% !important;
+    height: 100% !important;
+}}
+
+/* Column container - critical for grid layout */
+.st-emotion-cache-1wrcr25 {{
+    max-width: none !important;
+    padding: 0 1rem !important;
+}}
+
+/* Individual column styling */
+.st-emotion-cache-1n76uvr {{
+    padding: 0.5rem !important;
+}}
+
+/* Image cards */
+.image-card {{
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+    margin-bottom: 20px;
+    background: #f8f9fa;
+}}
+
+.image-card:hover {{
+    transform: translateY(-3px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+}}
+
+.image-container {{
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4/3;
+}}
+
+.image-container img {{
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}}
+
+.meta-overlay {{
+    padding: 10px;
+    background: rgba(0,0,0,0.85);
+    color: white;
+    font-size: 13px;
+    line-height: 1.4;
+}}
+</style>
+""",
+    unsafe_allow_html=True,
+)
+## endregion
 
 ###-------------
 
